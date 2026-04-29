@@ -1,4 +1,4 @@
-# NeuroCare AI
+# NeuroCare AI chatbot
 
 NeuroCare AI is an agentic RAG chatbot for dementia care. It combines document retrieval, response validation, topic filtering, tone-aware replies, and web fallback search to deliver grounded answers for patients, caregivers, and healthcare-related use cases.
 
