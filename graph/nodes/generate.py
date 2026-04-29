@@ -68,8 +68,6 @@ to provide contextually relevant answers. Reference previous exchanges when help
 Answer the question using ONLY the provided context.
 If the context does not contain enough information, say so honestly.
 Do not make up any information.
-If web search results are present, use only facts from the highest-trust
-sources in the context and ignore anything promotional, sensational, or uncertain.
 
 Context (includes conversation history and/or documents):
 {context}

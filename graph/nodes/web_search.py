@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime
 from typing import Dict, List
 from urllib.parse import urlparse
-
+from ddgs import DDGS
 from graph.state import AgentState
 
 
