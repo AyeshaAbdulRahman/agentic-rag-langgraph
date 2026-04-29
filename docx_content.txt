@@ -1,0 +1,576 @@
+🧠
+NeuroCare AI
+Agentic RAG Chatbot — Complete Master Plan
+Dementia Care  |  LangGraph  |  Mistral Free  |  Python 3.13
+Version 2.0  —  Updated with Emotional Tone Detection & Auto Spell Correction
+1.  Project Overview
+NeuroCare AI is a domain-restricted Agentic RAG chatbot for dementia care. It is built with LangGraph and uses a multi-node intelligent pipeline to ensure safe, accurate, and emotionally aware responses.
+What the chatbot does:
+Answers ONLY dementia and Alzheimer-related questions — off-topic questions are blocked with a kind message
+Corrects ALL spelling mistakes in user query automatically before processing (any word, not just medical terms)
+Detects the emotional tone of the user's message (anxious, sad, frustrated, calm, confused)
+Retrieves the most relevant chunks from your uploaded PDF/TXT documents using FAISS vector search
+Grades each retrieved chunk for relevance — filters out irrelevant content before answering
+Falls back to free DuckDuckGo web search if document data is insufficient
+Generates a grounded, accurate answer and checks it for hallucinations
+Responds with emotionally appropriate language based on detected user tone
+Shows source documents and page numbers for every answer (transparency)
+Supports both Mistral (free) and OpenAI as the LLM — switchable via .env
+2.  System Architecture — LangGraph Agent Flow
+The system is a directed graph. Each node does exactly one job. The graph decides which path to take based on the results of each node.
+FULL FLOW:
+
+USER MESSAGE
+    ↓
+[Node 1]  Spell Check Node         → Fixes ALL typos automatically
+    ↓
+[Node 2]  Tone Detection Node      → Detects: anxious / sad / frustrated / calm / confused
+    ↓
+[Node 3]  Topic Guard Node         → Is this dementia-related? NO → END with kind refusal
+    ↓ YES
+[Node 4]  Retrieve Node            → FAISS search → top 5 chunks from your documents
+    ↓
+[Node 5]  Grade Documents Node     → LLM grades each chunk: relevant or not?
+    ↓
+  [Decision] Enough relevant docs?
+    ↓ YES                              ↓ NO
+[Node 6a] Generate Node            [Node 6b] Web Search Node (DuckDuckGo free)
+    ↓                                  ↓
+[Node 7]  Grade Answer Node        → Is answer grounded? NO → retry generate once
+    ↓ YES
+[Node 8]  Emotional Response Node  → Wraps answer in tone matching user emotion
+    ↓
+FINAL REPLY  (answer + sources + tone used + web_search flag)
+Node Summary Table:
+Node
+File
+What It Does
+1. Spell Check
+nodes/spell_check.py
+Corrects ALL words automatically. Uses pyspellchecker + custom word list. Runs on raw user input.
+2. Tone Detection
+nodes/tone_detect.py
+LLM reads user message and returns one of: anxious, sad, frustrated, confused, calm. Stored in state.
+3. Topic Guard
+nodes/topic_guard.py
+LLM checks if query is dementia/memory-care related. If NO → returns kind refusal → END.
+4. Retrieve
+nodes/retrieve.py
+Loads FAISS index, runs similarity search on corrected query, returns top 5 Document chunks.
+5. Grade Documents
+nodes/grade_documents.py
+LLM grades each chunk YES/NO for relevance. Filters out irrelevant. If 0 left → web search.
+6a. Generate
+nodes/generate.py
+LLM creates answer from relevant document chunks with structured prompt.
+6b. Web Search
+nodes/web_search.py
+DuckDuckGo free search. No API key needed. Returns top 3 results as context string.
+7. Grade Answer
+nodes/grade_answer.py
+LLM checks if answer is supported by context. If not grounded → retry once → then proceed.
+8. Emotional Response
+nodes/emotional.py
+LLM rewrites answer with tone matching user emotion. Anxious → reassuring. Sad → comforting. etc.
+3.  Complete Project Structure
+Every single file and folder — exactly as it should be on disk:
+neurocare-chatbot/
+│
+├── data/                            ← YOUR DEMENTIA PDFs AND TXTs GO HERE
+│   ├── dementia_guide.pdf
+│   └── caregiving_handbook.txt
+│
+├── vectorstore/                     ← AUTO-CREATED by ingestion.py (do not edit)
+│   ├── index.faiss
+│   └── index.pkl
+│
+├── processed/                       ← AUTO-CREATED by ingestion.py (do not edit)
+│   └── chunks.jsonl
+│
+├── graph/                           ← LANGGRAPH AGENT LOGIC
+│   ├── __init__.py
+│   ├── state.py                     ← Shared state object (memory between nodes)
+│   ├── graph.py                     ← Assembles all nodes into LangGraph
+│   └── nodes/                       ← ONE FILE PER NODE
+│       ├── __init__.py
+│       ├── spell_check.py           ← Node 1: Auto spell correction (ALL words)
+│       ├── tone_detect.py           ← Node 2: Detects user emotional tone
+│       ├── topic_guard.py           ← Node 3: Dementia topic filter
+│       ├── retrieve.py              ← Node 4: FAISS vector search
+│       ├── grade_documents.py       ← Node 5: Document relevance grader
+│       ├── generate.py              ← Node 6a: LLM answer generator
+│       ├── web_search.py            ← Node 6b: DuckDuckGo fallback search
+│       ├── grade_answer.py          ← Node 7: Hallucination checker
+│       └── emotional.py             ← Node 8: Empathetic tone writer
+│
+├── ingestion.py                     ← Run ONCE to process documents → FAISS index
+├── chatbot.py                       ← ChatHandler class: runs the LangGraph
+├── server.py                        ← FastAPI REST API server
+├── llm_factory.py                   ← Returns Mistral or OpenAI LLM object
+├── config.py                        ← All settings in one place
+├── main.py                          ← Entry point: --ingest / --chat / --server
+├── requirements.txt                 ← All pip packages
+└── .env                             ← API keys (NEVER commit to GitHub)
+4.  Every File — Libraries, Purpose, and Details
+4.1  requirements.txt
+Install everything with: pip install -r requirements.txt
+Python 3.13 compatible. All free.
+Package
+Version
+Why Needed
+langgraph
+>=0.2.0
+Builds the agentic graph with nodes and conditional edges
+langchain
+>=0.3.0
+Core chains, prompts, document objects
+langchain-community
+>=0.3.0
+FAISS integration, DuckDuckGo tool, embeddings
+langchain-mistralai
+>=0.2.0
+Mistral AI LLM (free tier)
+langchain-openai
+>=0.2.0
+OpenAI LLM (optional, paid)
+faiss-cpu
+>=1.8.0
+Local vector database — fast similarity search
+sentence-transformers
+>=3.0.0
+Free local embeddings — no API key
+duckduckgo-search
+>=6.0.0
+Free web search — no API key needed at all
+pypdf
+>=4.0.0
+Reads and extracts text from PDF files
+python-dotenv
+>=1.0.0
+Loads .env file variables into environment
+pyspellchecker
+>=0.8.0
+Spell checking and auto-correction of all words
+fastapi
+>=0.115.0
+REST API server for React frontend
+uvicorn
+>=0.30.0
+Runs the FastAPI server
+pydantic
+>=2.0.0
+Data validation — used by LangGraph state
+tqdm
+>=4.66.0
+Progress bars during document ingestion
+torch
+>=2.0.0
+Required by sentence-transformers (runs locally)
+httpx
+>=0.27.0
+HTTP client — required by langchain-mistralai
+4.2  .env — Environment Variables
+Create this file in the root folder. Never add it to GitHub.
+# ── LLM Choice ──────────────────────────────────────────────────────
+LLM_PROVIDER=mistral                   # Change to 'openai' if you want OpenAI
+# ── Mistral (FREE) ───────────────────────────────────────────────────
+MISTRAL_API_KEY=your_mistral_key_here  # Get free at: console.mistral.ai
+# ── OpenAI (OPTIONAL, PAID) ──────────────────────────────────────────
+OPENAI_API_KEY=                        # Leave blank if using Mistral
+# ── LangChain Tracing — TURN OFF (no key needed) ─────────────────────
+LANGCHAIN_TRACING_V2=false
+LANGCHAIN_PROJECT=neurocare-rag        # Any name, just a label
+4.3  config.py — Central Settings
+Libraries used: os, dotenv
+Purpose: One file for all settings. Every other file imports from here. Never hardcode values in other files.
+Settings it contains:
+DATA_DIR = 'data'                          (folder with your PDFs)
+VECTORSTORE_DIR = 'vectorstore'            (FAISS index folder)
+PROCESSED_DIR = 'processed'               (chunks.jsonl folder)
+CHUNK_SIZE = 800                           (characters per chunk)
+CHUNK_OVERLAP = 150                        (overlap between chunks)
+TOP_K_RETRIEVAL = 5                        (number of chunks to retrieve)
+EMBEDDING_MODEL = 'all-MiniLM-L6-v2'      (free SentenceTransformer model)
+LLM_PROVIDER = os.getenv('LLM_PROVIDER')  (reads from .env)
+MISTRAL_MODEL = 'mistral-small-latest'    (free Mistral model name)
+OPENAI_MODEL = 'gpt-3.5-turbo'            (if using OpenAI)
+4.4  llm_factory.py — LLM Selector
+Libraries used: langchain_mistralai (ChatMistralAI), langchain_openai (ChatOpenAI), config, dotenv
+Purpose: Single function get_llm() that returns the correct LLM based on LLM_PROVIDER in .env. All 8 nodes call this function — no LLM config is repeated anywhere.
+Logic:
+If LLM_PROVIDER == 'mistral'  →  return ChatMistralAI(model=MISTRAL_MODEL, temperature=0)
+If LLM_PROVIDER == 'openai'   →  return ChatOpenAI(model=OPENAI_MODEL, temperature=0)
+Else                          →  raise clear error message
+4.5  ingestion.py — Document Processor
+Libraries used: pypdf (PdfReader), langchain.text_splitter (RecursiveCharacterTextSplitter), langchain_community.vectorstores (FAISS), sentence_transformers (SentenceTransformerEmbeddings), langchain.schema (Document), uuid, json, pathlib, tqdm, config
+Purpose: Reads all PDF and TXT files from data/ folder, splits them into overlapping chunks, creates embeddings using free local SentenceTransformer, saves FAISS index.
+Functions:
+load_documents_from_dir(data_dir)     reads all .pdf and .txt files
+clean_text(text)                       removes extra whitespace and blank lines
+chunk_documents(docs)                  splits text into 800-char chunks, 150 overlap
+create_vectorstore(chunks)             SentenceTransformer embeddings + FAISS index
+save_chunks_jsonl(chunks)              saves chunk metadata to processed/chunks.jsonl
+main()                                 runs all steps in order
+Run once: python ingestion.py
+Run again whenever you add new documents to data/ folder.
+4.6  graph/state.py — LangGraph State
+Libraries used: langgraph (add_messages), pydantic (BaseModel), typing (List, Optional, Annotated)
+Purpose: Defines the AgentState class — the shared memory object that every node reads and writes. LangGraph passes this state from node to node automatically.
+State fields:
+Field Name
+Type
+Set By Node
+Purpose
+question
+str
+chatbot.py
+Original raw user message
+corrected_question
+str
+spell_check
+User message after spell correction
+user_tone
+str
+tone_detect
+Detected tone: anxious/sad/frustrated/confused/calm
+is_on_topic
+bool
+topic_guard
+True if dementia-related, False if off-topic
+refusal_message
+Optional[str]
+topic_guard
+Kind refusal message if off-topic
+documents
+List[Document]
+retrieve
+Top-K chunks from FAISS search
+filtered_documents
+List[Document]
+grade_documents
+Only relevant chunks after grading
+web_search_results
+Optional[str]
+web_search
+DuckDuckGo results as string
+used_web_search
+bool
+web_search
+Flag: True if web search was used
+generation
+str
+generate
+Raw LLM answer before emotional wrapping
+answer_grounded
+bool
+grade_answer
+True if answer is supported by context
+retry_count
+int
+grade_answer
+Tracks how many times generation was retried
+final_answer
+str
+emotional
+Final empathetic answer ready for user
+sources
+List[dict]
+generate
+List of {text, source, page} for each chunk used
+4.7  graph/nodes/spell_check.py — Node 1
+Libraries used: pyspellchecker (SpellChecker), re, config
+Purpose: Automatically corrects ALL spelling mistakes in the user's raw query. This runs before any other processing so all downstream nodes get clean text.
+How it works:
+Create SpellChecker instance
+Tokenize the query into individual words using regex
+For each word: call spell.correction(word) to get the best corrected version
+Preserve capitalization of original word
+Reconstruct the corrected sentence
+Store in state.corrected_question
+Important: pyspellchecker handles ALL words automatically — medical, common, and everything else.
+No manual word lists needed. If a word is unknown to the dictionary it is left as-is.
+Example corrections:
+'demensia symtoms' → 'dementia symptoms'
+'wat is alzeimer desease' → 'what is alzheimer disease'
+'my granmather is forgetfull' → 'my grandmother is forgetful'
+4.8  graph/nodes/tone_detect.py — Node 2
+Libraries used: langchain (PromptTemplate, LLMChain), llm_factory, config
+Purpose: Reads the corrected user message and detects the emotional tone. This tone is stored in state and used later by the emotional.py node to craft the right response.
+Prompt sent to LLM:
+Read this message from a dementia caregiver or patient:
+'{message}'
+Classify the emotional tone into EXACTLY ONE of these words:
+anxious | sad | frustrated | confused | calm
+Reply with ONLY the single word. Nothing else.
+Tone meanings and how the chatbot responds:
+Detected Tone
+User Situation
+Chatbot Response Style
+anxious
+Worried about symptoms or future
+Reassuring, calming, 'You are not alone...'
+sad
+Grieving, upset about loved one
+Gentle, compassionate, 'It is okay to feel this way...'
+frustrated
+Overwhelmed, burnt out caregiver
+Validating, practical, 'This is incredibly hard...'
+confused
+Unsure what is happening
+Clear, simple language, step-by-step explanations
+calm
+Normal informational question
+Professional, informative, warm but not excessive
+4.9  graph/nodes/topic_guard.py — Node 3
+Libraries used: langchain (PromptTemplate, LLMChain), llm_factory
+Purpose: Checks if the corrected query is about dementia, Alzheimer's, memory care, or caregiving. If not — ends the conversation with a kind, empathetic refusal.
+Logic:
+Send query to LLM with strict classification prompt
+LLM replies 'YES' or 'NO' only
+If YES → state.is_on_topic = True → graph continues to retrieve node
+If NO  → state.is_on_topic = False → state.refusal_message is set → graph goes to END
+Refusal message example:
+'I'm here specifically to support with dementia-related questions.
+ I'm not able to help with that topic, but I'm ready to
+ assist you with anything about memory care, caregiving,
+ or Alzheimer's whenever you need. 💙'
+4.10  graph/nodes/retrieve.py — Node 4
+Libraries used: langchain_community.vectorstores (FAISS), sentence_transformers (SentenceTransformerEmbeddings), langchain.schema (Document), config
+Purpose: Loads the FAISS vector index from disk and searches for the top-K most semantically similar chunks to the corrected user question.
+Steps:
+Load SentenceTransformerEmbeddings (same model used in ingestion — must match)
+Load FAISS index from vectorstore/ using FAISS.load_local()
+Run similarity_search(state.corrected_question, k=TOP_K_RETRIEVAL)
+Store results in state.documents (list of Document objects)
+Each Document object contains:
+page_content — the actual chunk text
+metadata.source — filename (e.g., dementia_guide.pdf)
+metadata.page — page number
+metadata.chunk_id — unique ID
+4.11  graph/nodes/grade_documents.py — Node 5
+Libraries used: langchain (PromptTemplate), pydantic (BaseModel), llm_factory
+Purpose: For each retrieved chunk, asks the LLM whether it is actually relevant to the user question. Removes irrelevant chunks before generation.
+Grading prompt per chunk:
+Question: {question}
+Document chunk: {chunk_text}
+Is this chunk relevant to answering the question?
+Reply with ONLY 'yes' or 'no'.
+Decision after grading:
+If filtered_documents has 1 or more chunks → go to generate node
+If filtered_documents is empty            → go to web_search node
+4.12  graph/nodes/web_search.py — Node 6b
+Libraries used: duckduckgo_search (DDGS), langchain_community.tools (DuckDuckGoSearchRun)
+Purpose: When document retrieval yields no relevant results, searches the web using DuckDuckGo. Completely free — no API key needed.
+Steps:
+Use DuckDuckGoSearchRun tool from langchain_community
+Search query = state.corrected_question
+Fetch top 3 results
+Combine results into a single context string
+Store in state.web_search_results
+Set state.used_web_search = True
+4.13  graph/nodes/generate.py — Node 6a
+Libraries used: langchain (PromptTemplate, LLMChain), llm_factory, config
+Purpose: Generates the actual answer using either document chunks or web search results as context. Uses a carefully designed prompt to ensure accuracy and dementia-specific focus.
+Context selection logic:
+If state.filtered_documents is not empty → use document chunks as context
+If state.web_search_results is set       → use web results as context
+Prompt template:
+You are a compassionate dementia care expert assistant.
+Answer the question using ONLY the provided context.
+If the context does not contain enough information, say so honestly.
+Do not make up any information.
+Context:
+{context}
+Question: {question}
+Provide a clear, accurate, helpful answer:
+Output: state.generation = raw answer text, state.sources = list of source references
+4.14  graph/nodes/grade_answer.py — Node 7
+Libraries used: langchain (PromptTemplate), llm_factory
+Purpose: Anti-hallucination check. Verifies that the generated answer is actually supported by the context that was provided. Prevents the LLM from making up information.
+Grading prompt:
+Context provided: {context}
+Generated answer: {answer}
+Is this answer fully supported by the context above?
+Reply with ONLY 'yes' or 'no'.
+Decision:
+If 'yes' → state.answer_grounded = True → go to emotional node
+If 'no' and retry_count < 2 → increment retry_count → go back to generate node
+If 'no' and retry_count >= 2 → accept answer anyway → go to emotional node
+4.15  graph/nodes/emotional.py — Node 8
+Libraries used: langchain (PromptTemplate, LLMChain), llm_factory
+Purpose: The most important node for user experience. Rewrites the factual answer with the appropriate emotional tone based on what tone_detect.py detected.
+Prompt template:
+You are a warm, compassionate dementia care assistant.
+The user's emotional tone is: {user_tone}
+Rewrite this answer with the appropriate emotional awareness:
+- If tone is 'anxious':    Start with reassurance. Use calm, steady language.
+- If tone is 'sad':        Start with empathy. Acknowledge their pain first.
+- If tone is 'frustrated': Validate their struggle. Be practical and brief.
+- If tone is 'confused':   Use simple words. Break into clear steps.
+- If tone is 'calm':       Be warm but professional and informative.
+Original answer: {answer}
+Emotionally aware response:
+Example transformations:
+User Tone
+Original Answer
+After Emotional Node
+anxious
+Early dementia symptoms include memory loss and confusion.
+I understand how worrying this must feel. You are not alone in this. Early dementia symptoms include memory loss and confusion — and knowing this is the first step toward getting the right support. 💙
+sad
+Caregivers should take regular breaks to avoid burnout.
+It's okay to feel overwhelmed — caring for someone with dementia is one of the hardest things a person can do. Please remember that taking regular breaks isn't selfish — it's necessary and you deserve that care too.
+confused
+Dementia has several stages with different characteristics.
+Let me explain this simply. Dementia happens in stages. In the early stage, people may forget small things. In the middle stage, they need more help. In the later stage, they need full-time care.
+4.16  graph/graph.py — LangGraph Builder
+Libraries used: langgraph (StateGraph, END), all node files, state.py
+Purpose: Assembles all 8 nodes into the complete LangGraph directed graph with correct conditional edges.
+Graph structure:
+START → spell_check_node
+spell_check_node → tone_detect_node
+tone_detect_node → topic_guard_node
+topic_guard_node → [CONDITIONAL]
+if is_on_topic == False  → END
+if is_on_topic == True   → retrieve_node
+retrieve_node → grade_documents_node
+grade_documents_node → [CONDITIONAL]
+if filtered_documents empty → web_search_node
+if filtered_documents exist → generate_node
+web_search_node → generate_node
+generate_node → grade_answer_node
+grade_answer_node → [CONDITIONAL]
+if not grounded and retry < 2 → generate_node
+if grounded or retry >= 2     → emotional_node
+emotional_node → END
+4.17  chatbot.py — ChatHandler
+Libraries used: graph.graph (compiled_graph), langchain.schema, typing
+Purpose: Main interface class used by server.py. Initializes the LangGraph, runs it with user input, formats and returns the final response.
+Method chat(user_message) returns:
+{
+  'reply':           final_answer (emotionally aware, complete response),
+  'references':      [{text, source, page}] for each chunk used,
+  'used_web_search': True/False,
+  'tone_detected':   'anxious'/'sad'/'frustrated'/'confused'/'calm'
+}
+4.18  server.py — FastAPI Server
+Libraries used: fastapi, uvicorn, chatbot (ChatHandler), typing
+Purpose: REST API server. Your React frontend sends POST /chat requests here.
+Endpoint: POST /chat
+Request body: { message: string, session_id: string, history: [...] }
+Response: { reply, references, used_web_search, tone_detected, history }
+CORS: enabled for all origins (React can connect from any port)
+4.19  main.py — Entry Point
+Libraries used: argparse, ingestion, chatbot, uvicorn, server
+Purpose: Single command to run any part of the system.
+python main.py --ingest     # Process documents → build FAISS index
+python main.py --chat       # Run chatbot in terminal (for testing)
+python main.py --server     # Start FastAPI server at localhost:5001
+5.  Installation — Step by Step
+Step 1 — Get Free Mistral API Key
+Open browser: https://console.mistral.ai
+Click Sign Up → use email (no credit card needed)
+Go to: API Keys → Create new key
+Copy the key (starts with: sk-)
+Paste it in your .env file as MISTRAL_API_KEY=your_key
+Mistral free tier includes: mistral-small-latest model, enough for this project. No credit card required.
+Step 2 — Create Project Folder
+mkdir neurocare-chatbot
+cd neurocare-chatbot
+Step 3 — Create Virtual Environment
+python -m venv venv
+venv\Scripts\activate          # Windows PowerShell
+source venv/bin/activate         # Mac / Linux
+Step 4 — Install All Libraries
+pip install langgraph langchain langchain-community langchain-mistralai langchain-openai faiss-cpu sentence-transformers duckduckgo-search pypdf python-dotenv pyspellchecker fastapi uvicorn pydantic tqdm torch httpx
+torch installation may take 5-10 minutes — this is normal.
+Step 5 — Create .env File
+Create a file named exactly .env in the root folder:
+MISTRAL_API_KEY=your_key_here
+LLM_PROVIDER=mistral
+LANGCHAIN_TRACING_V2=false
+LANGCHAIN_PROJECT=neurocare-rag
+Step 6 — Add Your Dementia Data
+Create folder: data/
+Copy all your PDF and TXT dementia files into data/
+Any number of files works
+Step 7 — Run Ingestion
+python main.py --ingest
+This reads all files in data/, creates chunks, builds FAISS index. Takes 1-5 min depending on file size. Run once, or again when you add new files.
+Step 8 — Test in Terminal
+python main.py --chat
+Type a dementia question and check the response. Type an off-topic question and verify it gets blocked.
+Step 9 — Start Server
+python main.py --server
+Server starts at: http://127.0.0.1:5001  — your React frontend connects here.
+6.  Example Conversation Flows
+Flow A — Off-Topic Question (Blocked)
+User types:      'What is Python programming?'
+Spell check:     'What is Python programming?' (no change needed)
+Tone detected:   calm
+Topic guard:     NOT dementia related → STOP
+Final reply:     'I'm here specifically to help with dementia and memory care questions.
+                  I'm not able to assist with that topic, but please feel free to ask
+                  me anything about Alzheimer's, caregiving, or memory support. 💙'
+Flow B — Worried User, Answer from Documents
+User types:      'im so scared wat if my mum has alzeimer'
+Spell check:     'i'm so scared what if my mum has alzheimer'
+Tone detected:   anxious
+Topic guard:     YES — dementia related
+Retrieve:        Top 5 chunks from documents about Alzheimer's diagnosis
+Grade docs:      4 of 5 chunks are relevant
+Generate:        'Alzheimer's diagnosis involves memory tests and brain scans...'
+Grade answer:    Grounded — yes
+Emotional node:  Tone is anxious → adds reassurance
+Final reply:     'I can hear how frightening this must feel, and your love for your
+                  mum is so clear. You are not alone in this. If Alzheimer's is
+                  suspected, doctors typically begin with memory and cognitive tests,
+                  followed by brain imaging... [Source: alzheimer_guide.pdf, Page 12]'
+Flow C — Sad User, Web Search Needed
+User types:      'my dad doesnt recognize me anymore i am heartbroken'
+Spell check:     'my dad doesn't recognize me anymore I am heartbroken'
+Tone detected:   sad
+Topic guard:     YES — dementia related
+Retrieve:        Chunks retrieved but none specifically about recognition loss
+Grade docs:      0 relevant chunks
+Web search:      DuckDuckGo: 'dementia patient stops recognizing family'
+Generate:        Answer from web results about agnosia in dementia
+Grade answer:    Grounded — yes
+Emotional node:  Tone is sad → compassionate, gentle response
+Final reply:     'What you are going through is one of the most painful experiences
+                  in caregiving, and it is completely okay to grieve this. When someone
+                  with dementia stops recognizing loved ones, it is called agnosia...
+                  [Source: Web Search]'
+7.  Implementation Phases
+Phase
+Goal
+Files to Create
+Test
+Phase 1
+Day 1
+Setup & LLM working
+requirements.txt, .env, config.py, llm_factory.py
+python -c "from llm_factory import get_llm; print(get_llm().invoke('hi'))"
+Phase 2
+Day 1-2
+Document ingestion
+data/ folder, ingestion.py, main.py (--ingest only)
+Check vectorstore/ folder is created with index.faiss
+Phase 3
+Day 2-3
+State + Nodes 1-4
+graph/state.py, spell_check.py, tone_detect.py, topic_guard.py, retrieve.py
+Test each node individually with print statements
+Phase 4
+Day 3-4
+Nodes 5-8 + Graph
+grade_documents.py, generate.py, web_search.py, grade_answer.py, emotional.py, graph.py
+Run full graph with test questions
+Phase 5
+Day 4-5
+Server + Frontend
+chatbot.py, server.py, main.py (complete)
+POST /chat with Postman, then connect React
+You've Got This 💙
+Follow one phase at a time. Each phase has a clear test so you know it is working.
+Dementia patients and their families will be grateful for this. 🧠❤️
