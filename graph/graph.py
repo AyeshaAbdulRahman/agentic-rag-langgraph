@@ -24,6 +24,7 @@ from graph.nodes.generate import generate_node
 from graph.nodes.web_search import web_search_node
 from graph.nodes.grade_answer import grade_answer_node
 from graph.nodes.emotional import emotional_node
+from config import MAX_GENERATE_RETRIES
 
 
 def build_graph():
@@ -86,7 +87,7 @@ def build_graph():
     
     # Grade answer: conditional branch (retry or proceed)
     def should_retry(x):
-        if not x.answer_grounded and x.retry_count < 2:
+        if not x.answer_grounded and x.retry_count < MAX_GENERATE_RETRIES:
             return "generate"  # Retry
         else:
             return "emotional"  # Proceed

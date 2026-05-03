@@ -39,31 +39,31 @@ def emotional_node(state: AgentState) -> AgentState:
             "The user is worried and fearful. "
             "Start with reassurance and calm language. "
             "Emphasize they are not alone and help is available. "
-            "Be gentle and supportive."
+            "Be supportive but clear. Include complete information to address their concerns."
         ),
         'sad': (
             "The user is grieving or upset. "
             "Start with compassionate acknowledgment of their pain. "
             "Validate their feelings before providing information. "
-            "Be gentle and empathetic."
+            "Be empathetic but informative."
         ),
         'frustrated': (
-            "The user is overwhelmed and burnt out. "
+            "The user is overwhelmed. "
             "Validate how hard this is. "
-            "Be practical and concise. "
-            "Focus on actionable advice, not lengthy explanations."
+            "Provide well-organized, clear information. "
+            "Use practical examples but don't oversimplify."
         ),
         'confused': (
-            "The user is unsure or disoriented. "
-            "Use simple, crystal-clear language. "
-            "Break information into small, numbered steps. "
-            "Avoid jargon."
+            "The user is unsure or asking for clarification. "
+            "Use clear, simple language. "
+            "Break information into understandable chunks. "
+            "Avoid jargon and explain key terms."
         ),
         'calm': (
-            "The user is asking neutrally and factually. "
+            "The user is asking factually and neutrally. "
             "Keep the tone professional and informative. "
-            "Be clear and well-organized but NOT overly emotional. "
-            "Minimal emotional wrapping - just add warmth, not drama."
+            "Be clear and direct. Minimal emotional wrapping needed. "
+            "Just add warmth, not extra details."
         )
     }
     
@@ -81,13 +81,21 @@ Original answer:
 {original_answer}
 
 Rewrite this answer to match the user's emotional state.
-Rules:
-- Keep ALL factual information intact
-- Add emotional warmth only if needed (for anxious/sad/frustrated/confused tones)
-- For calm/neutral tone: Keep it professional and clear. Add minimal emotional wrapping.
-- Never add facts not in the original
-- Never be patronizing or overly dramatic
-- Match the energy level of the original tone guidance
+
+CRITICAL RULES:
+- Keep the SAME length and level of detail as the original
+- Do NOT add extra information, expand, or summarize
+- Do NOT make it longer unless absolutely necessary for emotional tone
+- Preserve all facts, examples, and structure
+- Only adjust the emotional tone/language, not the content
+
+For calm/neutral tone: Minimal changes needed. Keep it concise and clear.
+For anxious/sad/frustrated/confused: Add appropriate emotional warmth while keeping the same information.
+
+Do NOT:
+- Patronize or over-dramatize
+- Add facts not in the original
+- Change the answer length or detail level unnecessarily
 
 Final response:"""
     )

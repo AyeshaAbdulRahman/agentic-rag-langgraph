@@ -42,10 +42,22 @@ def generate_node(state: AgentState) -> AgentState:
     if state.filtered_documents:
         for i, doc in enumerate(state.filtered_documents):
             context_text += f"\n[Document {i+1}]\n{doc.page_content}\n"
+            
+            # Extract chunk metadata
+            chunk_id = doc.metadata.get('chunk_id', 'N/A')
+            source = doc.metadata.get('source', 'Unknown')
+            page = doc.metadata.get('page', 'N/A')
+            
+            # Build source reference in format: "Chunk <ID> | Page <N> | <filename>"
+            source_ref = f"Chunk {chunk_id} | Page {page} | {source}"
+            
             sources.append({
-                'text': doc.page_content[:200],
-                'source': doc.metadata.get('source', 'Unknown'),
-                'page': doc.metadata.get('page', 'N/A')
+                'text': doc.page_content[:500],  # Include more context (500 chars instead of 200)
+                'source': source_ref,
+                'chunk_id': chunk_id,
+                'page': page,
+                'filename': source,
+                'full_text': doc.page_content  # Store full text for detailed references
             })
     
     # Priority 2: Use web search results if no documents
@@ -54,10 +66,13 @@ def generate_node(state: AgentState) -> AgentState:
         sources.append({
             'text': 'Web search results',
             'source': 'Web Search',
-            'page': 'N/A'
+            'chunk_id': 'N/A',
+            'page': 'N/A',
+            'filename': 'Web Search',
+            'full_text': state.web_search_results
         })
     
-    # Build generation prompt
+    # Build generation prompt with detailed answer instructions
     prompt_template = PromptTemplate(
         input_variables=["context", "question"],
         template="""You are a compassionate dementia care expert assistant.
@@ -65,16 +80,41 @@ def generate_node(state: AgentState) -> AgentState:
 You are having a multi-turn conversation. Pay attention to the conversation history
 to provide contextually relevant answers. Reference previous exchanges when helpful.
 
-Answer the question using ONLY the provided context.
-If the context does not contain enough information, say so honestly.
-Do not make up any information.
+==== DETAILED ANSWER GUIDELINES ====
+
+Your goal is to provide COMPREHENSIVE, WELL-STRUCTURED, and DETAILED answers.
+
+ANSWER STRUCTURE:
+1. Start with a clear, direct answer to the main question
+2. Provide detailed explanation backed by context
+3. Include practical details, examples, and specifics from the provided information
+4. Organize information into logical paragraphs (not bullet points unless asked)
+
+DEPTH GUIDELINES:
+- For SIMPLE questions: Provide at least 1-2 detailed paragraphs (4-5 sentences each)
+- For MODERATE complexity: Provide 2-3 comprehensive paragraphs explaining different aspects
+- For COMPLEX questions: Provide 3-5+ paragraphs with structured guidance, specific examples, and practical tips
+- For caregiving/practical questions: Always give step-by-step guidance with real details from context
+- ALWAYS extract and USE the full context - don't abbreviate or summarize superficially
+
+QUALITY REQUIREMENTS:
+- Be confident and authoritative while staying grounded in provided context
+- Explain WHY things matter and HOW to apply information when relevant
+- Break down complex topics into understandable parts
+- Use clear transitions between ideas
+- Reference specific details from the context you're given
+- If context is incomplete, provide what's available and explicitly note gaps
+
+IMPORTANT: Answer using ONLY the provided context.
+If context is insufficient, be honest and note what information is missing.
+Never invent, infer, or add unsupported medical facts.
 
 Context (includes conversation history and/or documents):
 {context}
 
-Current Question: {question}
+User's Question: {question}
 
-Provide a clear, accurate, helpful answer that builds on the conversation:"""
+=== GENERATE DETAILED ANSWER NOW ==="""
     )
     
     # Get LLM
@@ -89,8 +129,9 @@ Provide a clear, accurate, helpful answer that builds on the conversation:"""
         generation = response.content
     else:
         generation = (
-            "I apologize, but I don't have enough information in my documents to answer this question. "
-            "Would you like me to search the web for more information?"
+            "I apologize, but I don't have enough information in my documents to answer this question comprehensively. "
+            "The context needed to provide you a detailed answer is not available. "
+            "Would you like me to search the web for more detailed information on this topic?"
         )
     
     state.generation = generation.strip()

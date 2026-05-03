@@ -169,7 +169,7 @@ class ChatHandler:
     
     def _format_response(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Format the final state into a user-friendly response.
+        Format the final state into a user-friendly response with detailed sources.
         
         Args:
             state: Final state after graph execution (returned as dict by invoke)
@@ -191,15 +191,19 @@ class ChatHandler:
                 "Please try asking your question differently."
             )
         
-        # Format references
+        # Keep sources only in the structured references payload.
+        # This prevents clients from showing them twice.
         references = []
         sources = state.get('sources', [])
+        
         if sources:
             for source in sources:
                 references.append({
-                    'text': source.get('text', '')[:100],
+                    'text': source.get('text', '')[:200],
                     'source': source.get('source', 'Unknown'),
-                    'page': source.get('page', 'N/A')
+                    'page': source.get('page', 'N/A'),
+                    'chunk_id': source.get('chunk_id', 'N/A'),
+                    'filename': source.get('filename', 'Unknown')
                 })
         
         # Build response

@@ -6,7 +6,7 @@ actually supported by the context that was provided.
 
 If grounded: proceed to emotional node
 If not grounded and retries remaining: go back to generate node
-If not grounded but max retries exceeded: proceed anyway
+If not grounded but max retries exceeded: replace with a safe fallback
 """
 
 from langchain_core.prompts import PromptTemplate
@@ -38,7 +38,10 @@ def grade_answer_node(state: AgentState) -> AgentState:
     elif state.web_search_results:
         context_text = state.web_search_results[:500]
     else:
-        # No context available, can't grade
+        state.generation = (
+            "I do not have enough grounded information in the available context to answer this reliably. "
+            "I can only answer based on the provided material, so I would rather be transparent than guess."
+        )
         state.answer_grounded = True
         return state
     
@@ -79,12 +82,17 @@ Reply with ONLY 'yes' or 'no'."""
     
     state.answer_grounded = is_grounded
     
-    # If not grounded, check if we can retry
+    # If not grounded, retry while allowed.
     if not is_grounded and state.retry_count < MAX_GENERATE_RETRIES:
         state.retry_count += 1
-        # Signal to retry generation (graph will handle this)
     else:
-        # Either grounded or max retries reached - proceed
+        # If retries are exhausted, replace the answer with a safe fallback.
+        if not is_grounded:
+            state.generation = (
+                "I cannot verify a fully grounded answer from the available context. "
+                "To avoid giving you misleading information, I should stop here instead of guessing. "
+                "If you want, I can answer only the clearly supported part of the question."
+            )
         state.answer_grounded = True
     
     return state

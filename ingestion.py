@@ -15,6 +15,7 @@ Or via: python main.py --ingest
 import os
 import json
 import re
+import uuid
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -168,7 +169,8 @@ def chunk_documents(
                     page_content=chunk_text,
                     metadata={
                         **doc.metadata,
-                        'chunk_id': f"{doc.metadata['source']}_chunk_{chunk_num}",
+                        'chunk_id': str(uuid.uuid4()),  # Generate UUID for each chunk
+                        'chunk_num': chunk_num,
                         'original_source': doc.metadata['source']
                     }
                 )
